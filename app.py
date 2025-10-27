@@ -1,94 +1,24 @@
-# app.py
-# 🚧 Construction Safety Detector (Streamlit + EfficientNet)
-
 import streamlit as st
-import tensorflow as tf
-from tensorflow.keras.applications import EfficientNetB0
-from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import GlobalAveragePooling2D, Dropout, Dense
-from PIL import Image
 import numpy as np
-import gdown
-import os
+import tensorflow as tf
+import joblib
 
-# ------------------------------------------------------------
-# ⚙️ Page Configuration
-# ------------------------------------------------------------
-st.set_page_config(page_title="Construction Safety Detector", page_icon="🦺", layout="centered")
-st.title("🦺 Construction Site Safety Detector")
-st.write("Upload an image to check whether the site is **Safe ✅** or **Unsafe 🚧**")
+st.title("🧠 Hazard Detection System")
+st.write("Upload data and predict whether it’s hazardous or safe.")
 
-# ------------------------------------------------------------
-# 🔗 Google Drive Model Link
-# ------------------------------------------------------------
-MODEL_URL = "https://drive.google.com/uc?id=1eug-EkN_7KH2MVClBwc8VGi16XnftYCd"
-MODEL_PATH = "efficientnet_hazard_model.h5"
+# Load model
+model = tf.keras.models.load_model("hazard_model.h5")
 
-# ------------------------------------------------------------
-# ⬇️ Download model if not present
-# ------------------------------------------------------------
-if not os.path.exists(MODEL_PATH):
-    with st.spinner("📥 Downloading model... Please wait..."):
-        gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
-        st.success("✅ Model downloaded successfully!")
+# Example input (based on your dataset features)
+feature_names = ["feature1", "feature2", "feature3"]  # update as per your dataset
 
-# ------------------------------------------------------------
-# 🧠 Robust Model Loader
-# ------------------------------------------------------------
-@st.cache_resource
-def load_hazard_model():
-    try:
-        # Try full model load first
-        model = load_model(MODEL_PATH, compile=False)
-        st.info("✅ Full model loaded successfully!")
-        return model
-    except Exception as e1:
-        st.warning(f"⚠️ Full model load failed: {e1}")
-        try:
-            # Try weights-only load
-            base = EfficientNetB0(weights=None, include_top=False, input_shape=(128, 128, 3))
-            model = Sequential([
-                base,
-                GlobalAveragePooling2D(),
-                Dropout(0.4),
-                Dense(64, activation='relu'),
-                Dense(1, activation='sigmoid')
-            ])
-            model.load_weights(MODEL_PATH)
-            st.info("✅ Model rebuilt and weights loaded!")
-            return model
-        except Exception as e2:
-            st.error(f"❌ Could not load model or weights:\n{e2}")
-            st.stop()
+inputs = []
+for name in feature_names:
+    val = st.number_input(f"Enter {name}:", value=0.0)
+    inputs.append(val)
 
-model = load_hazard_model()
-st.success("✅ Model ready for predictions!")
-
-# ------------------------------------------------------------
-# 📤 Upload Image
-# ------------------------------------------------------------
-uploaded_file = st.file_uploader("Upload a construction site image (JPG/PNG)...", type=["jpg", "jpeg", "png"])
-
-if uploaded_file is not None:
-    img = Image.open(uploaded_file).convert("RGB")
-    st.image(img, caption="Uploaded Image", use_column_width=True)
-
-    # Preprocess
-    img_resized = img.resize((128, 128))
-    x = np.array(img_resized) / 255.0
-    x = np.expand_dims(x, axis=0)
-
-    # Predict
-    with st.spinner("🔍 Analyzing image..."):
-        pred = model.predict(x)[0][0]
-        confidence = (pred if pred > 0.5 else 1 - pred) * 100
-
-    # Result Display
-    if pred > 0.5:
-        st.markdown("<h2 style='color:red;text-align:center;'>🚧 UNSAFE: Hazard Detected!</h2>", unsafe_allow_html=True)
-    else:
-        st.markdown("<h2 style='color:green;text-align:center;'>✅ SAFE: No Hazard Detected!</h2>", unsafe_allow_html=True)
-
-    st.write(f"**Model Confidence:** {confidence:.2f}%")
-else:
-    st.info("📸 Please upload an image to start prediction.")
+if st.button("Predict Hazard"):
+    X_input = np.array([inputs])
+    prediction = model.predict(X_input)
+    class_idx = np.argmax(prediction)
+    st.success(f"Predicted Class: {class_idx}")
