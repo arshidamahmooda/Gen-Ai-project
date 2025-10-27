@@ -17,7 +17,7 @@ import requests, os
 # ----------------------------------------------------
 # STEP 1: Download model from Google Drive or Hugging Face
 # ----------------------------------------------------
-MODEL_URL = "https://drive.google.com/uc?id=YOUR_FILE_ID"  # 🔹 Replace this link
+MODEL_URL = "https://drive.google.com/uc?id=1eug-EkN_7KH2MVClBwc8VGi16XnftYCd"  # 🔹 Replace this link
 MODEL_PATH = "efficientnet_hazard_model.h5"
 
 if not os.path.exists(MODEL_PATH):
