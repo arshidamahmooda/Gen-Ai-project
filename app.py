@@ -1,39 +1,83 @@
-from transformers import pipeline
+# ====================================================
+# 🧠 Generative AI Hazard Detection System
+# ====================================================
+# Author: Your Name
+# Description:
+# - Loads a trained hazard detection model (EfficientNet)
+# - Classifies uploaded images as Safe or Unsafe
+# - Uses Generative AI (FLAN-T5) to generate a safety report
+# ====================================================
+
+import streamlit as st
 import tensorflow as tf
 import numpy as np
-import streamlit as st
+from PIL import Image
+import requests, os
 
-# Load your trained hazard detection model
-model = tf.keras.models.load_model("hazard_model.h5")
+# ----------------------------------------------------
+# STEP 1: Download model from Google Drive or Hugging Face
+# ----------------------------------------------------
+MODEL_URL = "https://drive.google.com/uc?id=YOUR_FILE_ID"  # 🔹 Replace this link
+MODEL_PATH = "efficientnet_hazard_model.h5"
 
-# Load a small generative model (e.g., T5 for report generation)
-gen_ai = pipeline("text2text-generation", model="google/flan-t5-small")
+if not os.path.exists(MODEL_PATH):
+    st.write("📥 Downloading model file...")
+    with open(MODEL_PATH, "wb") as f:
+        f.write(requests.get(MODEL_URL).content)
+    st.success("✅ Model downloaded successfully!")
 
-st.title("🧠 Generative AI Hazard Detection")
-st.write("Detect hazards and generate automatic reports!")
+# ----------------------------------------------------
+# STEP 2: Load model
+# ----------------------------------------------------
+st.write("🔄 Loading hazard detection model...")
+model = tf.keras.models.load_model(MODEL_PATH)
+st.success("✅ Model loaded successfully!")
 
-# Example input fields
-feature_names = ["feature1", "feature2", "feature3"]  # update as per dataset
-inputs = []
-for f in feature_names:
-    val = st.number_input(f"Enter {f}:", value=0.0)
-    inputs.append(val)
+# ----------------------------------------------------
+# STEP 3: Streamlit UI
+# ----------------------------------------------------
+st.title("🧠 Generative AI Hazard Detection System")
+st.write("Upload a worksite image to detect if it’s **Safe or Unsafe**, and let AI generate a safety report.")
 
-if st.button("Analyze Hazard"):
-    X_input = np.array([inputs])
-    pred = model.predict(X_input)
-    hazard_idx = np.argmax(pred)
+uploaded_file = st.file_uploader("📸 Upload Image", type=["jpg", "jpeg", "png"])
 
-    if hazard_idx == 1:
-        hazard_type = "Hazardous"
-    else:
-        hazard_type = "Safe"
+if uploaded_file is not None:
+    image = Image.open(uploaded_file).convert("RGB")
+    st.image(image, caption="Uploaded Image", use_container_width=True)
 
-    st.write(f"🔍 Prediction: **{hazard_type}**")
+    # Preprocess image
+    img = image.resize((128, 128))
+    img_array = np.array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
 
-    # Generate AI-based explanation
-    prompt = f"Generate a short safety report for a {hazard_type} situation."
-    report = gen_ai(prompt, max_length=60)[0]['generated_text']
+    # Predict
+    pred = model.predict(img_array)[0][0]
+    label = "Unsafe" if pred > 0.5 else "Safe"
+    confidence = float(pred) if label == "Unsafe" else 1 - float(pred)
 
-    st.subheader("📝 AI-Generated Report:")
+    st.subheader(f"🔍 Prediction: **{label}**")
+    st.write(f"Confidence: {confidence:.2f}")
+
+    # ----------------------------------------------------
+    # STEP 4: Generative AI Explanation (FLAN-T5)
+    # ----------------------------------------------------
+    from transformers import pipeline
+
+    st.write("🧠 Generating AI-based safety report...")
+    gen_ai = pipeline("text2text-generation", model="google/flan-t5-small")
+
+    prompt = f"Write a short safety report for a {label.lower()} construction worksite."
+    report = gen_ai(prompt, max_length=80)[0]['generated_text']
+
+    st.subheader("📝 AI-Generated Safety Report:")
     st.write(report)
+
+# ----------------------------------------------------
+# STEP 5: Footer
+# ----------------------------------------------------
+st.markdown("""
+---
+**Project:** Generative AI Hazard Detection  
+**Model:** EfficientNetB0 + FLAN-T5  
+**Developed with ❤️ using Streamlit**
+""")
