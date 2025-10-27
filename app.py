@@ -1,5 +1,5 @@
 # app.py
-# 🚧 Construction Safety Detector - Streamlit App (fixed EfficientNet model issue)
+# 🚧 Construction Safety Detector (Streamlit + EfficientNet)
 
 import streamlit as st
 import tensorflow as tf
@@ -33,31 +33,36 @@ if not os.path.exists(MODEL_PATH):
         st.success("✅ Model downloaded successfully!")
 
 # ------------------------------------------------------------
-# 🧠 Load Model Safely
+# 🧠 Robust Model Loader
 # ------------------------------------------------------------
 @st.cache_resource
 def load_hazard_model():
     try:
-        # Try direct load first
+        # Try full model load first
         model = load_model(MODEL_PATH, compile=False)
+        st.info("✅ Full model loaded successfully!")
         return model
-    except Exception:
-        st.warning("⚠️ Direct load failed, rebuilding EfficientNet architecture...")
-
-        # Rebuild same architecture as training
-        base = EfficientNetB0(weights=None, include_top=False, input_shape=(128, 128, 3))
-        model = Sequential([
-            base,
-            GlobalAveragePooling2D(),
-            Dropout(0.4),
-            Dense(64, activation='relu'),
-            Dense(1, activation='sigmoid')
-        ])
-        model.load_weights(MODEL_PATH)
-        return model
+    except Exception as e1:
+        st.warning(f"⚠️ Full model load failed: {e1}")
+        try:
+            # Try weights-only load
+            base = EfficientNetB0(weights=None, include_top=False, input_shape=(128, 128, 3))
+            model = Sequential([
+                base,
+                GlobalAveragePooling2D(),
+                Dropout(0.4),
+                Dense(64, activation='relu'),
+                Dense(1, activation='sigmoid')
+            ])
+            model.load_weights(MODEL_PATH)
+            st.info("✅ Model rebuilt and weights loaded!")
+            return model
+        except Exception as e2:
+            st.error(f"❌ Could not load model or weights:\n{e2}")
+            st.stop()
 
 model = load_hazard_model()
-st.success("✅ Model loaded successfully!")
+st.success("✅ Model ready for predictions!")
 
 # ------------------------------------------------------------
 # 📤 Upload Image
@@ -78,7 +83,7 @@ if uploaded_file is not None:
         pred = model.predict(x)[0][0]
         confidence = (pred if pred > 0.5 else 1 - pred) * 100
 
-    # Display result
+    # Result Display
     if pred > 0.5:
         st.markdown("<h2 style='color:red;text-align:center;'>🚧 UNSAFE: Hazard Detected!</h2>", unsafe_allow_html=True)
     else:
