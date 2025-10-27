@@ -1,9 +1,11 @@
 # app.py
-# 🚧 Construction Safety Detector - Streamlit App
+# 🚧 Construction Safety Detector - Streamlit App (fixed EfficientNet model issue)
 
 import streamlit as st
 import tensorflow as tf
-from tensorflow.keras.models import load_model
+from tensorflow.keras.applications import EfficientNetB0
+from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.layers import GlobalAveragePooling2D, Dropout, Dense
 from PIL import Image
 import numpy as np
 import gdown
@@ -19,40 +21,43 @@ st.write("Upload an image to check whether the site is **Safe ✅** or **Unsafe 
 # ------------------------------------------------------------
 # 🔗 Google Drive Model Link
 # ------------------------------------------------------------
-# 👉 Replace with your OWN Google Drive share link (Make it 'Anyone with the link')
-# Example:
-# https://drive.google.com/file/d/1ABCxyz123/view?usp=sharing
-# ↓ becomes:
-# https://drive.google.com/uc?id=1ABCxyz123
 MODEL_URL = "https://drive.google.com/uc?id=1eug-EkN_7KH2MVClBwc8VGi16XnftYCd"
 MODEL_PATH = "efficientnet_hazard_model.h5"
 
 # ------------------------------------------------------------
-# ⬇️ Download model if not already present
+# ⬇️ Download model if not present
 # ------------------------------------------------------------
 if not os.path.exists(MODEL_PATH):
     with st.spinner("📥 Downloading model... Please wait..."):
-        try:
-            gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
-            st.success("✅ Model downloaded successfully!")
-        except Exception as e:
-            st.error(f"❌ Failed to download model: {e}")
-            st.stop()
+        gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+        st.success("✅ Model downloaded successfully!")
 
 # ------------------------------------------------------------
-# 🧠 Load Model
+# 🧠 Load Model Safely
 # ------------------------------------------------------------
 @st.cache_resource
 def load_hazard_model():
     try:
+        # Try direct load first
         model = load_model(MODEL_PATH, compile=False)
         return model
-    except Exception as e:
-        st.error(f"❌ Failed to load model: {e}")
-        st.stop()
+    except Exception:
+        st.warning("⚠️ Direct load failed, rebuilding EfficientNet architecture...")
+
+        # Rebuild same architecture as training
+        base = EfficientNetB0(weights=None, include_top=False, input_shape=(128, 128, 3))
+        model = Sequential([
+            base,
+            GlobalAveragePooling2D(),
+            Dropout(0.4),
+            Dense(64, activation='relu'),
+            Dense(1, activation='sigmoid')
+        ])
+        model.load_weights(MODEL_PATH)
+        return model
 
 model = load_hazard_model()
-st.success("✅ Model ready for prediction!")
+st.success("✅ Model loaded successfully!")
 
 # ------------------------------------------------------------
 # 📤 Upload Image
@@ -73,7 +78,7 @@ if uploaded_file is not None:
         pred = model.predict(x)[0][0]
         confidence = (pred if pred > 0.5 else 1 - pred) * 100
 
-    # Result Display
+    # Display result
     if pred > 0.5:
         st.markdown("<h2 style='color:red;text-align:center;'>🚧 UNSAFE: Hazard Detected!</h2>", unsafe_allow_html=True)
     else:
