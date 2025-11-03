@@ -7,7 +7,7 @@ Original file is located at
     https://colab.research.google.com/drive/1cs-xhAJyPnXq0TP4gNKkxkyc7ko34K5j
 """
 
-!pip install streamlit diffusers transformers accelerate torch Pillow --quiet
+
 
 import streamlit as st
 from diffusers import StableDiffusionPipeline
