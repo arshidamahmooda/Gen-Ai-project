@@ -2,39 +2,42 @@ import streamlit as st
 from transformers import pipeline
 from diffusers import StableDiffusionPipeline
 from PIL import Image, ImageDraw, ImageFont
-import torch
+import textwrap, torch
 
-st.set_page_config(page_title="AI Comic Generator 🎨", layout="wide")
+st.set_page_config(page_title="AI Comic Generator", layout="centered")
 
-st.title("🎭 AI Comic Generator")
-st.write("Create your own mini comic by entering a short story or prompt below!")
+st.title("🎨 AI Comic Generator")
+st.markdown("Generate a mini comic scene using AI (GPT-2 for story + Stable Diffusion for images).")
 
-# User input
-story_prompt = st.text_area("✍️ Enter a short story or scene:", 
-                            "A robot finds a flower in the desert and learns what emotions mean.")
+# --- Text Input ---
+prompt = st.text_area("Enter your comic idea or scene:", "A superhero cat saves the city from robot dogs!")
 
-if st.button("✨ Generate Comic"):
-    with st.spinner("Generating captions and images..."):
-        # Generate text captions
+if st.button("Generate Comic"):
+    with st.spinner("Generating comic story..."):
+        # --- Text Generation ---
         text_gen = pipeline("text-generation", model="gpt2")
-        captions = text_gen(story_prompt, max_new_tokens=60, num_return_sequences=3)
-        captions = [c['generated_text'].strip().split('.')[:2] for c in captions]
+        story = text_gen(prompt, max_length=80, num_return_sequences=1)[0]["generated_text"]
+        st.subheader("🗨️ Comic Story")
+        st.write(story)
 
-        # Initialize diffusion pipeline (low VRAM mode)
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model_id = "runwayml/stable-diffusion-v1-5"
-        image_pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16 if device=="cuda" else torch.float32)
-        image_pipe = image_pipe.to(device)
+    with st.spinner("Generating comic image... (takes ~30s on CPU)"):
+        # --- Image Generation ---
+        pipe = StableDiffusionPipeline.from_pretrained(
+            "runwayml/stable-diffusion-v1-5",
+            torch_dtype=torch.float32
+        )
+        pipe.to("cpu")
 
-        comic_panels = []
-        for idx, cap in enumerate(captions):
-            text = '. '.join(cap)
-            image = image_pipe(text).images[0]
-            comic_panels.append((image, text))
+        image = pipe(prompt).images[0]
 
-    st.success("✅ Comic generated!")
-    st.write("---")
+        # Add caption on image
+        draw = ImageDraw.Draw(image)
+        wrapped_text = textwrap.fill(prompt, width=30)
+        font = ImageFont.load_default()
+        draw.text((10, 10), wrapped_text, fill="white", font=font)
 
-    # Display generated panels
-    for i, (img, txt) in enumerate(comic_panels, start=1):
-        st.image(img, caption=f"🖼️ Panel {i}: {txt}", use_container_width=True)
+        st.subheader("🖼️ Generated Comic Panel")
+        st.image(image, use_container_width=True)
+
+st.markdown("---")
+st.caption("Made with ❤️ using Streamlit + Hugging Face (GPT-2 + Stable Diffusion)")
