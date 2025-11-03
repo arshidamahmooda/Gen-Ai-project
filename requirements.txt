@@ -1,7 +1,6 @@
 streamlit
-torch
 transformers
 diffusers
+torch
 accelerate
 Pillow
-
