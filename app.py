@@ -4,12 +4,13 @@ from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 import textwrap
 import google.generativeai as genai
+import os
 
 # ------------------------------
 # 🎨 Streamlit Page Setup
 # ------------------------------
 st.set_page_config(page_title="🎨 Gemini Comic Generator", layout="centered")
-st.title("🎨 AI Comic Generator (Gemini Powered)")
+st.title("🎨 AI Comic Generator ")
 st.markdown("Create short comic stories using **Google Gemini + Pollinations API** 🎭")
 
 # ------------------------------
@@ -33,7 +34,8 @@ if st.button("🎬 Generate Comic"):
 
     # --- Gemini Text Generation ---
     try:
-        genai.configure(api_key="YOUR_GEMINI_API_KEY")  # 🔑 Replace with your Gemini key
+        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+  # 🔑 Replace with your Gemini key
 
         model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content(
