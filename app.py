@@ -1,21 +1,20 @@
 import streamlit as st
-import requests
+from transformers import pipeline
+from diffusers import StableDiffusionPipeline
+import torch
 from PIL import Image, ImageDraw, ImageFont
-from io import BytesIO
 import textwrap
-import google.generativeai as genai
-import os
 
-# ------------------------------
-# 🎨 Streamlit Page Setup
-# ------------------------------
-st.set_page_config(page_title="🎨 Gemini Comic Generator", layout="centered")
-st.title("🎨 AI Comic Generator ")
-st.markdown("Create short comic stories using **Google Gemini + Pollinations API** 🎭")
+# -------------------------
+# 🎨 Streamlit App Setup
+# -------------------------
+st.set_page_config(page_title="🎨 Offline AI Comic Generator", layout="centered")
+st.title("🎨 Offline AI Comic Generator")
+st.markdown("Create comic panels using **GPT-2 + Stable Diffusion**")
 
-# ------------------------------
+# -------------------------
 # 🧠 User Input
-# ------------------------------
+# -------------------------
 prompt = st.text_area(
     "✍️ Enter your comic idea:",
     """Frog Prince’s Day Off
@@ -26,35 +25,32 @@ Panel 3: He waves to surprised people as he zooms by fountains.
 Panel 4: The frog prince jumps into his favorite pond with a happy splash."""
 )
 
-# ------------------------------
-# 🚀 Generate Comic
-# ------------------------------
 if st.button("🎬 Generate Comic"):
-    st.info("⏳ Generating comic using Google Gemini...")
+    st.info("⏳ Generating comic... please wait 1–2 minutes for first-time model load.")
 
-    # --- Gemini Text Generation ---
-    try:
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-  # 🔑 Replace with your Gemini key
-
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(
-            f"Write a short, funny 3-line comic scene based on this idea:\n{prompt}"
-        )
-        story = response.text
-    except Exception as e:
-        story = f"⚠️ Error generating story: {e}"
-
+    # -------------------------
+    # 🧠 GPT-2 Text Generation
+    # -------------------------
     st.subheader("💬 Comic Storyline")
+    text_gen = pipeline("text-generation", model="gpt2")
+    story = text_gen(prompt, max_new_tokens=60)[0]["generated_text"]
     st.write(story)
 
-    # --- Generate Image (Pollinations API) ---
+    # -------------------------
+    # 🎨 Stable Diffusion Image Generation
+    # -------------------------
     st.subheader("🖼️ Comic Panel")
-    img_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}"
-    response = requests.get(img_url)
-    image = Image.open(BytesIO(response.content))
 
-    # --- Add caption text ---
+    # Use the Hugging Face model (you can choose others)
+    model_id = "runwayml/stable-diffusion-v1-5"
+    pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16)
+    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+
+    image = pipe(prompt).images[0]
+
+    # -------------------------
+    # 🗨️ Add Caption Text
+    # -------------------------
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()
     wrapped = textwrap.fill(prompt, width=30)
@@ -62,4 +58,4 @@ if st.button("🎬 Generate Comic"):
 
     st.image(image, caption="✨ AI-generated Comic Panel", use_container_width=True)
 
-st.caption("🚀 Powered by Google Gemini + Pollinations + Streamlit")
+st.caption("🚀 Powered by GPT-2 + Stable Diffusion + Streamlit ")
