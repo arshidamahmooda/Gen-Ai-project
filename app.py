@@ -6,6 +6,10 @@ import textwrap
 import openai
 import os
 
+# ✅ New OpenAI client syntax
+from openai import OpenAI
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 st.set_page_config(page_title="🎨 AI Comic Generator", layout="centered")
 
 st.title("🎨 AI Comic Generator")
@@ -24,30 +28,28 @@ Panel 4: The frog prince jumps into his favorite pond with a happy splash."""
 if st.button("🎬 Generate Comic"):
     st.info("⏳ Generating your comic... please wait 10–15 seconds")
 
-    # --- GPT Text Generation ---
     try:
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        story_resp = openai.ChatCompletion.create(
+        # ✅ NEW API CALL
+        story_resp = client.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "You are a creative comic writer."},
                 {"role": "user", "content": f"Write a 3-line funny comic scene about: {prompt}"}
             ]
         )
-        story = story_resp.choices[0].message["content"].strip()
+        story = story_resp.choices[0].message.content.strip()
     except Exception as e:
         story = f"This comic shows: {prompt}. (Error: {e})"
 
     st.subheader("💬 Comic Storyline")
     st.write(story)
 
-    # --- Pollinations Image Generation (Lightweight) ---
+    # --- Pollinations Image Generation ---
     st.subheader("🖼️ Comic Panel")
     img_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}"
     response = requests.get(img_url)
     image = Image.open(BytesIO(response.content))
 
-    # --- Add caption text on image ---
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()
     wrapped = textwrap.fill(prompt, width=30)
@@ -55,4 +57,4 @@ if st.button("🎬 Generate Comic"):
 
     st.image(image, caption="✨ AI-generated Comic Panel", use_container_width=True)
 
-st.caption("🚀 Powered by OpenAI + Pollinations + Streamlit")
+st.caption("🚀 Powered by GPT-3.5-Turbo + Stable Diffusion (Pollinations) + Streamlit")
