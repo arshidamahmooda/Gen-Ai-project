@@ -1,87 +1,91 @@
+# =====================================================
+# 🎨 Lightweight Offline AI Comic Generator (Streamlit)
+# =====================================================
 import streamlit as st
-import requests
+from transformers import pipeline, set_seed
+from diffusers import StableDiffusionPipeline
 from PIL import Image, ImageDraw, ImageFont
-from io import BytesIO
-import textwrap
-import os
+import torch, textwrap, tempfile
 
-# -----------------------------
-# 🎨 App Configuration
-# -----------------------------
+# -----------------------------------------------------
+# ⚙️ App Configuration
+# -----------------------------------------------------
 st.set_page_config(page_title="🎨 AI Comic Creator", layout="centered")
+st.title("🎨 Lightweight AI Comic Creator")
+st.markdown("Generate a short comic scene from your idea ")
 
-st.title("🎨 AI Comic Creator")
-st.markdown("Generate a short comic scene from your text prompt using AI!")
-
-# -----------------------------
+# -----------------------------------------------------
 # ✍️ User Input
-# -----------------------------
-prompt = st.text_area("✍️ Enter your comic idea:", """Frog Prince’s Day Off
+# -----------------------------------------------------
+prompt = st.text_area(
+    "💭 Enter your comic idea:",
+    """Frog Prince’s Day Off
 
 Panel 1: The frog prince sneaks out of his castle wearing sunglasses.
 Panel 2: He rides a skateboard through the city streets.
 Panel 3: He waves to surprised people as he zooms by fountains.
-Panel 4: The frog prince jumps into his favorite pond with a happy splash.""")
+Panel 4: The frog prince jumps into his favorite pond with a happy splash.""",
+    height=150
+)
 
-# -----------------------------
-# 🚀 Generate Button
-# -----------------------------
-if st.button("Generate Comic"):
-    st.info("⏳ Generating... please wait 10–15 seconds")
+# -----------------------------------------------------
+# 🚀 Generate Comic
+# -----------------------------------------------------
+if st.button("🎬 Generate Comic"):
+    st.info("⏳ Generating story... please wait")
 
-    # --- Generate short storyline using OpenAI API ---
+    # === GPT-2 TEXT GENERATION ===
     try:
-        import openai
-
-        # ✅ Load your OpenAI API key safely
-        openai.api_key = os.getenv("OPENAI_API_KEY")  # Set in environment variable
-
-        if not openai.api_key or openai.api_key == "your_api_key_here":
-            raise ValueError("No valid API key found")
-
-        story_resp = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a creative comic writer."},
-                {"role": "user", "content": f"Write a funny 3-line comic scene about: {prompt}"}
-            ]
+        generator = pipeline("text-generation", model="gpt2")
+        set_seed(42)
+        story_output = generator(
+            f"Create a 3-line funny comic scene about: {prompt}",
+            max_length=80,
+            num_return_sequences=1
         )
-
-        story = story_resp.choices[0].message["content"].strip()
-
+        story = story_output[0]["generated_text"].strip()
+        st.subheader("💬 Comic Storyline")
+        st.write(story)
     except Exception as e:
-        # 🧩 Fallback if offline or missing API key
-        story = f"This comic shows: {prompt}. Our hero faces laughter, chaos, and triumph!"
-        st.warning(f"⚠️ Could not use OpenAI API ({e}). Using offline text instead.")
+        st.warning(f"Text generation failed: {e}")
+        story = prompt
 
-    # --- Display Story ---
-    st.subheader("💬 Comic Storyline")
-    st.write(story)
-
-    # -----------------------------
-    # 🖼️ Generate comic image using Pollinations API
-    # -----------------------------
+    # === IMAGE GENERATION ===
     st.subheader("🖼️ Comic Panel")
-
     try:
-        img_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}"
-        response = requests.get(img_url, timeout=30)
-        response.raise_for_status()
-        image = Image.open(BytesIO(response.content))
+        device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        # --- Add caption text on image ---
+        # Use a lighter diffusion model
+        model_id = "stabilityai/sd-turbo"  # smaller and faster
+        pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float32)
+        pipe = pipe.to(device)
+
+        with torch.inference_mode():
+            image = pipe(prompt).images[0]
+
+        # Add text overlay
         draw = ImageDraw.Draw(image)
         font = ImageFont.load_default()
-        wrapped = textwrap.fill(prompt, width=30)
+        wrapped = textwrap.fill(story[:200], width=40)
         draw.text((10, 10), wrapped, fill="white", font=font)
 
-        st.image(image, caption="✨ AI-generated Comic Panel", use_container_width=True)
+        st.image(image, caption="✨ Comic-Style AI Image", use_container_width=True)
 
+        # Save + download
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmpfile:
+            image.save(tmpfile.name)
+            st.download_button("📥 Download Comic", tmpfile.name, "comic.png")
     except Exception as e:
-        st.error(f"❌ Image generation failed: {e}")
-        st.info("💡 Try again with a different prompt or check your internet connection.")
+        st.warning(f"Stable Diffusion not supported here: {e}")
+        st.info("💡 Using lightweight online generator (Pollinations)...")
+        import requests
+        from io import BytesIO
+        try:
+            url = f"https://image.pollinations.ai/prompt/{prompt.replace(' ', '%20')}"
+            response = requests.get(url)
+            img = Image.open(BytesIO(response.content))
+            st.image(img, caption="✨ Comic (Generated via Pollinations)")
+        except:
+            st.error("❌ Image generation failed. Try again later.")
 
-# -----------------------------
-# 📘 Footer
-# -----------------------------
-st.caption("🚀 Powered by Streamlit + OpenAI + Pollinations API")
+st.caption("🚀 Powered by GPT-2 + sd-turbo + Streamlit (no API key needed)")
