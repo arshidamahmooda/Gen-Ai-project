@@ -1,9 +1,4 @@
-streamlit==1.39.0
-transformers==4.44.2
-torch==2.4.1
+streamlit
+openai==0.28.0
 pillow
 requests
-textwrap3
-diffusers==0.26.3
-accelerate
-safetensors
