@@ -36,7 +36,7 @@ if st.button("🎬 Generate Comic"):
 
     # === GPT-2 TEXT GENERATION ===
     try:
-        generator = pipeline("text-generation", model="gpt2")
+        generator = pipeline("text-generation", model="distilgpt2")
         set_seed(42)
         story_output = generator(
             f"Create a 3-line funny comic scene about: {prompt}",
