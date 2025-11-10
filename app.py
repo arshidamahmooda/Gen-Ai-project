@@ -1,61 +1,87 @@
 import streamlit as st
-from transformers import pipeline
-from diffusers import StableDiffusionPipeline
-import torch
+import requests
 from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
 import textwrap
+import os
 
-# -------------------------
-# 🎨 Streamlit App Setup
-# -------------------------
-st.set_page_config(page_title="🎨 Offline AI Comic Generator", layout="centered")
-st.title("🎨 Offline AI Comic Generator")
-st.markdown("Create comic panels using **GPT-2 + Stable Diffusion**")
+# -----------------------------
+# 🎨 App Configuration
+# -----------------------------
+st.set_page_config(page_title="🎨 AI Comic Creator", layout="centered")
 
-# -------------------------
-# 🧠 User Input
-# -------------------------
-prompt = st.text_area(
-    "✍️ Enter your comic idea:",
-    """Frog Prince’s Day Off
+st.title("🎨 AI Comic Creator")
+st.markdown("Generate a short comic scene from your text prompt using AI!")
+
+# -----------------------------
+# ✍️ User Input
+# -----------------------------
+prompt = st.text_area("✍️ Enter your comic idea:", """Frog Prince’s Day Off
 
 Panel 1: The frog prince sneaks out of his castle wearing sunglasses.
 Panel 2: He rides a skateboard through the city streets.
 Panel 3: He waves to surprised people as he zooms by fountains.
-Panel 4: The frog prince jumps into his favorite pond with a happy splash."""
-)
+Panel 4: The frog prince jumps into his favorite pond with a happy splash.""")
 
-if st.button("🎬 Generate Comic"):
-    st.info("⏳ Generating comic... please wait 1–2 minutes for first-time model load.")
+# -----------------------------
+# 🚀 Generate Button
+# -----------------------------
+if st.button("Generate Comic"):
+    st.info("⏳ Generating... please wait 10–15 seconds")
 
-    # -------------------------
-    # 🧠 GPT-2 Text Generation
-    # -------------------------
+    # --- Generate short storyline using OpenAI API ---
+    try:
+        import openai
+
+        # ✅ Load your OpenAI API key safely
+        openai.api_key = os.getenv("OPENAI_API_KEY")  # Set in environment variable
+
+        if not openai.api_key or openai.api_key == "your_api_key_here":
+            raise ValueError("No valid API key found")
+
+        story_resp = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a creative comic writer."},
+                {"role": "user", "content": f"Write a funny 3-line comic scene about: {prompt}"}
+            ]
+        )
+
+        story = story_resp.choices[0].message["content"].strip()
+
+    except Exception as e:
+        # 🧩 Fallback if offline or missing API key
+        story = f"This comic shows: {prompt}. Our hero faces laughter, chaos, and triumph!"
+        st.warning(f"⚠️ Could not use OpenAI API ({e}). Using offline text instead.")
+
+    # --- Display Story ---
     st.subheader("💬 Comic Storyline")
-    text_gen = pipeline("text-generation", model="gpt2")
-    story = text_gen(prompt, max_new_tokens=60)[0]["generated_text"]
     st.write(story)
 
-    # -------------------------
-    # 🎨 Stable Diffusion Image Generation
-    # -------------------------
+    # -----------------------------
+    # 🖼️ Generate comic image using Pollinations API
+    # -----------------------------
     st.subheader("🖼️ Comic Panel")
 
-    # Use the Hugging Face model (you can choose others)
-    model_id = "runwayml/stable-diffusion-v1-5"
-    pipe = StableDiffusionPipeline.from_pretrained(model_id, torch_dtype=torch.float16)
-    pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    try:
+        img_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}"
+        response = requests.get(img_url, timeout=30)
+        response.raise_for_status()
+        image = Image.open(BytesIO(response.content))
 
-    image = pipe(prompt).images[0]
+        # --- Add caption text on image ---
+        draw = ImageDraw.Draw(image)
+        font = ImageFont.load_default()
+        wrapped = textwrap.fill(prompt, width=30)
+        draw.text((10, 10), wrapped, fill="white", font=font)
 
-    # -------------------------
-    # 🗨️ Add Caption Text
-    # -------------------------
-    draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default()
-    wrapped = textwrap.fill(prompt, width=30)
-    draw.text((10, 10), wrapped, fill="white", font=font)
+        st.image(image, caption="✨ AI-generated Comic Panel", use_container_width=True)
 
-    st.image(image, caption="✨ AI-generated Comic Panel", use_container_width=True)
+    except Exception as e:
+        st.error(f"❌ Image generation failed: {e}")
+        st.info("💡 Try again with a different prompt or check your internet connection.")
 
-st.caption("🚀 Powered by GPT-2 + Stable Diffusion + Streamlit ")
+# -----------------------------
+# 📘 Footer
+# -----------------------------
+st.caption("🚀 Powered by Streamlit + OpenAI + Pollinations API")
