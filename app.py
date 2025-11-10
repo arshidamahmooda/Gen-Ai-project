@@ -1,7 +1,7 @@
 import streamlit as st
-from diffusers import StableDiffusionPipeline
-import torch
+import requests
 from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
 import textwrap
 import openai
 import os
@@ -9,7 +9,7 @@ import os
 st.set_page_config(page_title="🎨 AI Comic Generator", layout="centered")
 
 st.title("🎨 AI Comic Generator")
-st.markdown("Generate a short comic scene from your text prompt using Generative AI models!")
+st.markdown("Create short comic scenes using GPT + AI Image Generation")
 
 prompt = st.text_area(
     "✍️ Enter your comic idea:",
@@ -22,48 +22,37 @@ Panel 4: The frog prince jumps into his favorite pond with a happy splash."""
 )
 
 if st.button("🎬 Generate Comic"):
-    st.info("⏳ Generating your comic... please wait 20–40 seconds")
+    st.info("⏳ Generating your comic... please wait 10–15 seconds")
 
-    # --- Step 1: Generate short storyline using GPT ---
+    # --- GPT Text Generation ---
     try:
         openai.api_key = os.getenv("OPENAI_API_KEY")
-
         story_resp = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
-                {"role": "system", "content": "You are a witty comic writer."},
-                {"role": "user", "content": f"Write a 3-line comic scene about: {prompt}"}
+                {"role": "system", "content": "You are a creative comic writer."},
+                {"role": "user", "content": f"Write a 3-line funny comic scene about: {prompt}"}
             ]
         )
         story = story_resp.choices[0].message["content"].strip()
     except Exception as e:
-        story = f"This comic shows: {prompt}. Our hero faces laughter, chaos, and triumph!"
-        st.warning(f"Story generation fallback (error: {e})")
+        story = f"This comic shows: {prompt}. (Error: {e})"
 
     st.subheader("💬 Comic Storyline")
     st.write(story)
 
-    # --- Step 2: Generate comic image using Stable Diffusion ---
+    # --- Pollinations Image Generation (Lightweight) ---
     st.subheader("🖼️ Comic Panel")
-    try:
-        pipe = StableDiffusionPipeline.from_pretrained(
-            "runwayml/stable-diffusion-v1-5",
-            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32
-        )
-        pipe = pipe.to("cuda" if torch.cuda.is_available() else "cpu")
+    img_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}"
+    response = requests.get(img_url)
+    image = Image.open(BytesIO(response.content))
 
-        with torch.autocast("cuda" if torch.cuda.is_available() else "cpu"):
-            image = pipe(prompt, guidance_scale=7.5).images[0]
+    # --- Add caption text on image ---
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default()
+    wrapped = textwrap.fill(prompt, width=30)
+    draw.text((10, 10), wrapped, fill="white", font=font)
 
-        # Add caption on top
-        draw = ImageDraw.Draw(image)
-        font = ImageFont.load_default()
-        wrapped = textwrap.fill(prompt, width=30)
-        draw.text((10, 10), wrapped, fill="white", font=font)
+    st.image(image, caption="✨ AI-generated Comic Panel", use_container_width=True)
 
-        st.image(image, caption="✨ AI-generated Comic Panel", use_container_width=True)
-
-    except Exception as e:
-        st.error(f"Image generation failed: {e}")
-
-st.caption("🚀 Powered by OpenAI + Stable Diffusion + Streamlit")
+st.caption("🚀 Powered by OpenAI + Pollinations + Streamlit")
