@@ -10,7 +10,12 @@ st.set_page_config(page_title="🎨 AI Comic Creator", layout="centered")
 st.title("🎨 AI Comic Creator")
 st.markdown("Generate a short comic scene from your text prompt!")
 
-prompt = st.text_area("✍️ Enter your comic idea:", "A dog learns to play the guitar on stage!")
+prompt = st.text_area("✍️ Enter your comic idea:", "Frog Prince’s Day Off
+
+Panel 1: The frog prince sneaks out of his castle wearing sunglasses.
+Panel 2: He rides a skateboard through the city streets.
+Panel 3: He waves to surprised people as he zooms by fountains.
+Panel 4: The frog prince jumps into his favorite pond with a happy splash.")
 
 if st.button("Generate Comic"):
     st.info("⏳ Generating... please wait 10–15 seconds")
@@ -18,7 +23,7 @@ if st.button("Generate Comic"):
     # --- Generate short storyline using OpenAI API ---
     try:
         import openai
-        openai.api_key = os.getenv("OPENAI_API_KEY", "your_api_key_here")  # replace if running locally
+        openai.api_key = os.getenv("OPENAI_API_KEY", "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")  # replace if running locally
 
         story_resp = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
