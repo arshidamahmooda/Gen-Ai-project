@@ -3,18 +3,18 @@ import requests
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 import textwrap
-import openai
-import os
+import google.generativeai as genai
 
-# ✅ New OpenAI client syntax
-from openai import OpenAI
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+# ------------------------------
+# 🎨 Streamlit Page Setup
+# ------------------------------
+st.set_page_config(page_title="🎨 Gemini Comic Generator", layout="centered")
+st.title("🎨 AI Comic Generator (Gemini Powered)")
+st.markdown("Create short comic stories using **Google Gemini + Pollinations API** 🎭")
 
-st.set_page_config(page_title="🎨 AI Comic Generator", layout="centered")
-
-st.title("🎨 AI Comic Generator")
-st.markdown("Create short comic scenes using GPT + AI Image Generation")
-
+# ------------------------------
+# 🧠 User Input
+# ------------------------------
 prompt = st.text_area(
     "✍️ Enter your comic idea:",
     """Frog Prince’s Day Off
@@ -25,31 +25,34 @@ Panel 3: He waves to surprised people as he zooms by fountains.
 Panel 4: The frog prince jumps into his favorite pond with a happy splash."""
 )
 
+# ------------------------------
+# 🚀 Generate Comic
+# ------------------------------
 if st.button("🎬 Generate Comic"):
-    st.info("⏳ Generating your comic... please wait 10–15 seconds")
+    st.info("⏳ Generating comic using Google Gemini...")
 
+    # --- Gemini Text Generation ---
     try:
-        # ✅ NEW API CALL
-        story_resp = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "You are a creative comic writer."},
-                {"role": "user", "content": f"Write a 3-line funny comic scene about: {prompt}"}
-            ]
+        genai.configure(api_key="YOUR_GEMINI_API_KEY")  # 🔑 Replace with your Gemini key
+
+        model = genai.GenerativeModel("gemini-1.5-flash")
+        response = model.generate_content(
+            f"Write a short, funny 3-line comic scene based on this idea:\n{prompt}"
         )
-        story = story_resp.choices[0].message.content.strip()
+        story = response.text
     except Exception as e:
-        story = f"This comic shows: {prompt}. (Error: {e})"
+        story = f"⚠️ Error generating story: {e}"
 
     st.subheader("💬 Comic Storyline")
     st.write(story)
 
-    # --- Pollinations Image Generation ---
+    # --- Generate Image (Pollinations API) ---
     st.subheader("🖼️ Comic Panel")
     img_url = f"https://image.pollinations.ai/prompt/{requests.utils.quote(prompt)}"
     response = requests.get(img_url)
     image = Image.open(BytesIO(response.content))
 
+    # --- Add caption text ---
     draw = ImageDraw.Draw(image)
     font = ImageFont.load_default()
     wrapped = textwrap.fill(prompt, width=30)
@@ -57,4 +60,4 @@ if st.button("🎬 Generate Comic"):
 
     st.image(image, caption="✨ AI-generated Comic Panel", use_container_width=True)
 
-st.caption("🚀 Powered by GPT-3.5-Turbo + Stable Diffusion (Pollinations) + Streamlit")
+st.caption("🚀 Powered by Google Gemini + Pollinations + Streamlit")
